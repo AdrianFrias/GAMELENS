@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# que no subir
+.venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+datos/
+db/*.db
+models/*.pkl
+models/*.model
+models/*.npy
+*.npy
