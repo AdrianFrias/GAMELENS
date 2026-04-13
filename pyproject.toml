@@ -24,6 +24,7 @@ dependencies = [
     "seaborn>=0.13.2",
     "streamlit>=1.56.0",
     "thefuzz>=0.22.1",
+    "torch>=2.11.0",
     "umap-learn>=0.5.12",
     "xgboost>=3.2.0",
 ]
