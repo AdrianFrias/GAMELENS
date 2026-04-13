@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "emoji>=2.15.0",
+    "gdown>=6.0.0",
     "gensim>=4.4.0",
     "hdbscan>=0.8.42",
     "howlongtobeatpy>=1.0.21",
