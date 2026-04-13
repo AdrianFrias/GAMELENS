@@ -25,7 +25,7 @@ with st.sidebar.expander("🛠️ Debug: Estado de la Base de Datos"):
     else:
         st.write("❌ Archivo no encontrado localmente.")
 
-@@st.cache_resource
+@st.cache_resource
 def descargar_db(file_id):
     if not DB_PATH.exists() or os.path.getsize(DB_PATH) < 1_000_000:
         if DB_PATH.exists():
