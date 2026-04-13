@@ -17,15 +17,42 @@ st.set_page_config(page_title="GameLens M5", layout="wide")
 @st.cache_resource
 def descargar_db(file_id):
     if not DB_PATH.exists():
-        url = f'https://drive.google.com/uc?export=download&id={file_id}'
+        # Session para mantener las cookies de confirmación de Google
+        session = requests.Session()
+        confirm_url = "https://docs.google.com/uc?export=download"
+        
         try:
-            with st.spinner("Sincronizando catálogo desde Google Drive..."):
-                response = requests.get(url, stream=True)
+            with st.spinner("Descargando base de datos desde Drive (esto puede tardar)..."):
+                # Primera petición para obtener el token de confirmación
+                response = session.get(confirm_url, params={'id': file_id}, stream=True)
+                token = None
+                
+                for key, value in response.cookies.items():
+                    if key.startswith('download_warning'):
+                        token = value
+                        break
+
+                # Si hay un token, hacemos la petición definitiva con el token
+                if token:
+                    params = {'id': file_id, 'confirm': token}
+                    response = session.get(confirm_url, params=params, stream=True)
+                
                 response.raise_for_status()
+                
+                # Guardar el archivo
                 with open(DB_PATH, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
-            st.success("✅ Catálogo actualizado.")
+                        if chunk: f.write(chunk)
+            
+            # Verificación de seguridad: ¿Es realmente un archivo SQLite?
+            with open(DB_PATH, "rb") as f:
+                header = f.read(16)
+                if header != b'SQLite format 3\x00':
+                    os.remove(DB_PATH) # Borramos el archivo falso (HTML)
+                    st.error("❌ El archivo descargado no es una base de datos válida. Verifica que el ID sea correcto y el archivo sea público.")
+                    st.stop()
+            
+            st.success("✅ Base de datos sincronizada correctamente.")
         except Exception as e:
             st.error(f"Error al conectar con Drive: {e}")
             st.stop()
