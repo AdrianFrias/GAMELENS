@@ -4,57 +4,67 @@ import pandas as pd
 import requests
 import os
 from pathlib import Path
-
-# BASE_DIR será: C:\Proyectos\GameLens
+# --- CONFIGURACIÓN DE RUTAS ---
 BASE_DIR = Path(__file__).resolve().parent
+DB_DIR = BASE_DIR / "db"
+DB_PATH = DB_DIR / "gaming_warehouse.db"
 
-# DB_PATH será: C:\Proyectos\GameLens\db\gaming_warehouse.db
-DB_PATH = BASE_DIR / "db" / "gaming_warehouse.db"
+# Asegurar que la carpeta existe
+DB_DIR.mkdir(parents=True, exist_ok=True)
 
-st.set_page_config(page_title="GameLens M5", layout="wide")
+# --- SECCIÓN DE DEBUG (Para saber qué está pasando) ---
+with st.sidebar.expander("🛠️ Debug: Estado de la Base de Datos"):
+    if DB_PATH.exists():
+        size_mb = os.path.getsize(DB_PATH) / (1024 * 1024)
+        st.write(f"Archivo detectado: `{DB_PATH.name}`")
+        st.write(f"Tamaño: `{size_mb:.2f} MB`")
+        if st.button("🗑️ Borrar y Forzar Redescarga"):
+            os.remove(DB_PATH)
+            st.rerun()
+    else:
+        st.write("❌ Archivo no encontrado localmente.")
 
-# --- SINCRONIZACIÓN CON DRIVE ---
+# --- SINCRONIZACIÓN ROBUSTA ---
 @st.cache_resource
 def descargar_db(file_id):
+    # Si el archivo existe pero pesa menos de 100 bytes, probablemente sea un error
+    if DB_PATH.exists() and os.path.getsize(DB_PATH) < 1000:
+        os.remove(DB_PATH)
+
     if not DB_PATH.exists():
-        # Session para mantener las cookies de confirmación de Google
         session = requests.Session()
         confirm_url = "https://docs.google.com/uc?export=download"
         
         try:
-            with st.spinner("Descargando base de datos desde Drive (esto puede tardar)..."):
-                # Primera petición para obtener el token de confirmación
+            with st.spinner("Descargando base de datos desde Drive..."):
                 response = session.get(confirm_url, params={'id': file_id}, stream=True)
                 token = None
-                
                 for key, value in response.cookies.items():
                     if key.startswith('download_warning'):
                         token = value
                         break
 
-                # Si hay un token, hacemos la petición definitiva con el token
                 if token:
-                    params = {'id': file_id, 'confirm': token}
-                    response = session.get(confirm_url, params=params, stream=True)
+                    response = session.get(confirm_url, params={'id': file_id, 'confirm': token}, stream=True)
                 
                 response.raise_for_status()
-                
-                # Guardar el archivo
                 with open(DB_PATH, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk: f.write(chunk)
             
-            # Verificación de seguridad: ¿Es realmente un archivo SQLite?
+            # VALIDACIÓN CRÍTICA: ¿Es SQLite?
             with open(DB_PATH, "rb") as f:
                 header = f.read(16)
                 if header != b'SQLite format 3\x00':
-                    os.remove(DB_PATH) # Borramos el archivo falso (HTML)
-                    st.error("❌ El archivo descargado no es una base de datos válida. Verifica que el ID sea correcto y el archivo sea público.")
+                    # Si no es SQLite, lo que bajamos es un HTML de error
+                    contenido_error = header + f.read(100)
+                    os.remove(DB_PATH)
+                    st.error(f"❌ Error: El archivo de Drive no es una DB. Contenido recibido: {contenido_error}")
                     st.stop()
-            
-            st.success("✅ Base de datos sincronizada correctamente.")
+                    
+            st.success("✅ ¡Base de datos descargada con éxito!")
         except Exception as e:
-            st.error(f"Error al conectar con Drive: {e}")
+            st.error(f"Error en la descarga: {e}")
             st.stop()
     return str(DB_PATH)
 
