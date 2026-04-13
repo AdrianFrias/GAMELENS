@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 import os
 from pathlib import Path
+import gdown
 # --- CONFIGURACIÓN DE RUTAS ---
 BASE_DIR = Path(__file__).resolve().parent
 DB_DIR = BASE_DIR / "db"
@@ -24,43 +25,24 @@ with st.sidebar.expander("🛠️ Debug: Estado de la Base de Datos"):
     else:
         st.write("❌ Archivo no encontrado localmente.")
 
-# --- SINCRONIZACIÓN ROBUSTA ---
 @st.cache_resource
 def descargar_db(file_id):
-    if not DB_PATH.exists() or os.path.getsize(DB_PATH) < 1000000: # Si no existe o pesa menos de 1MB
-        if DB_PATH.exists(): os.remove(DB_PATH)
+    if not DB_PATH.exists() or os.path.getsize(DB_PATH) < 1_000_000:
+        if DB_PATH.exists():
+            os.remove(DB_PATH)
         
-        session = requests.Session()
-        URL = "https://docs.google.com/uc?export=download"
+        with st.spinner("Descargando base de datos (355MB)... Esto tomará un momento."):
+            url = f"https://drive.google.com/uc?id={file_id}"
+            gdown.download(url, str(DB_PATH), quiet=False, fuzzy=True)
         
-        try:
-            with st.spinner("Descargando base de datos pesada (355MB)... Esto tomará un momento."):
-                # 1. Intentar petición inicial
-                response = session.get(URL, params={'id': file_id}, stream=True)
-                
-                # 2. Buscar el token de confirmación en las cookies o en el HTML
-                token = None
-                for key, value in response.cookies.items():
-                    if key.startswith('download_warning'):
-                        token = value
-                        break
-                
-                # 3. Si hay token (archivo grande), pedir el archivo de nuevo con el token
-                if token:
-                    params = {'id': file_id, 'confirm': token}
-                    response = session.get(URL, params=params, stream=True)
-                
-                # 4. Descarga real del flujo de datos
-                response.raise_for_status()
-                with open(DB_PATH, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=32768): # Chunks más grandes para 355MB
-                        if chunk: f.write(chunk)
-            
-            st.success(f"✅ ¡Base de datos de {os.path.getsize(DB_PATH)/(1024*1024):.1f} MB descargada!")
-        except Exception as e:
-            st.error(f"Error crítico en la descarga: {e}")
+        size_mb = os.path.getsize(DB_PATH) / (1024 * 1024) if DB_PATH.exists() else 0
+        if size_mb < 1:
+            st.error(f"❌ Drive bloqueó la descarga ({size_mb:.1f} MB recibidos). Intenta de nuevo.")
+            if DB_PATH.exists(): os.remove(DB_PATH)
             st.stop()
-            
+        
+        st.success(f"✅ Base de datos descargada: {size_mb:.1f} MB")
+    
     return str(DB_PATH)
 
 # --- CARGA DE SECRETOS ---
