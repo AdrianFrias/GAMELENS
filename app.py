@@ -27,45 +27,40 @@ with st.sidebar.expander("🛠️ Debug: Estado de la Base de Datos"):
 # --- SINCRONIZACIÓN ROBUSTA ---
 @st.cache_resource
 def descargar_db(file_id):
-    # Si el archivo existe pero pesa menos de 100 bytes, probablemente sea un error
-    if DB_PATH.exists() and os.path.getsize(DB_PATH) < 1000:
-        os.remove(DB_PATH)
-
-    if not DB_PATH.exists():
+    if not DB_PATH.exists() or os.path.getsize(DB_PATH) < 1000000: # Si no existe o pesa menos de 1MB
+        if DB_PATH.exists(): os.remove(DB_PATH)
+        
         session = requests.Session()
-        confirm_url = "https://docs.google.com/uc?export=download"
+        URL = "https://docs.google.com/uc?export=download"
         
         try:
-            with st.spinner("Descargando base de datos desde Drive..."):
-                response = session.get(confirm_url, params={'id': file_id}, stream=True)
+            with st.spinner("Descargando base de datos pesada (355MB)... Esto tomará un momento."):
+                # 1. Intentar petición inicial
+                response = session.get(URL, params={'id': file_id}, stream=True)
+                
+                # 2. Buscar el token de confirmación en las cookies o en el HTML
                 token = None
                 for key, value in response.cookies.items():
                     if key.startswith('download_warning'):
                         token = value
                         break
-
-                if token:
-                    response = session.get(confirm_url, params={'id': file_id, 'confirm': token}, stream=True)
                 
+                # 3. Si hay token (archivo grande), pedir el archivo de nuevo con el token
+                if token:
+                    params = {'id': file_id, 'confirm': token}
+                    response = session.get(URL, params=params, stream=True)
+                
+                # 4. Descarga real del flujo de datos
                 response.raise_for_status()
                 with open(DB_PATH, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
+                    for chunk in response.iter_content(chunk_size=32768): # Chunks más grandes para 355MB
                         if chunk: f.write(chunk)
             
-            # VALIDACIÓN CRÍTICA: ¿Es SQLite?
-            with open(DB_PATH, "rb") as f:
-                header = f.read(16)
-                if header != b'SQLite format 3\x00':
-                    # Si no es SQLite, lo que bajamos es un HTML de error
-                    contenido_error = header + f.read(100)
-                    os.remove(DB_PATH)
-                    st.error(f"❌ Error: El archivo de Drive no es una DB. Contenido recibido: {contenido_error}")
-                    st.stop()
-                    
-            st.success("✅ ¡Base de datos descargada con éxito!")
+            st.success(f"✅ ¡Base de datos de {os.path.getsize(DB_PATH)/(1024*1024):.1f} MB descargada!")
         except Exception as e:
-            st.error(f"Error en la descarga: {e}")
+            st.error(f"Error crítico en la descarga: {e}")
             st.stop()
+            
     return str(DB_PATH)
 
 # --- CARGA DE SECRETOS ---
