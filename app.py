@@ -1,85 +1,76 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+import requests
+import os
 from pathlib import Path
 
-# --- CONFIGURACIÓN DE RUTAS ---
+# BASE_DIR será: C:\Proyectos\GameLens
 BASE_DIR = Path(__file__).resolve().parent
+
+# DB_PATH será: C:\Proyectos\GameLens\db\gaming_warehouse.db
 DB_PATH = BASE_DIR / "db" / "gaming_warehouse.db"
 
-st.set_page_config(page_title="Project M5 - Explorer", layout="wide")
+st.set_page_config(page_title="GameLens M5", layout="wide")
 
-# --- ESTILOS PERSONALIZADOS ---
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    .stMetric { background-color: #161b22; padding: 10px; border-radius: 10px; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- SINCRONIZACIÓN CON DRIVE ---
+@st.cache_resource
+def descargar_db(file_id):
+    if not DB_PATH.exists():
+        url = f'https://drive.google.com/uc?export=download&id={file_id}'
+        try:
+            with st.spinner("Sincronizando catálogo desde Google Drive..."):
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
+                with open(DB_PATH, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            st.success("✅ Catálogo actualizado.")
+        except Exception as e:
+            st.error(f"Error al conectar con Drive: {e}")
+            st.stop()
+    return str(DB_PATH)
 
-st.title("🎮 Project M5: Gaming Warehouse")
+# --- CARGA DE SECRETOS ---
+# Si estás en local y no has creado el .toml, pedirá el ID
+try:
+    ID_DRIVE = st.secrets["DRIVE_FILE_ID"]
+except:
+    st.warning("⚠️ No se encontró DRIVE_FILE_ID en los secretos.")
+    ID_DRIVE = st.text_input("Introduce el ID de Google Drive para continuar:")
+    if not ID_DRIVE: st.stop()
 
-# --- VALIDACIÓN DE CONEXIÓN ---
-if not DB_PATH.exists():
-    st.error(f"❌ No se encontró la DB en: {DB_PATH}")
-    st.stop()
+db_final = descargar_db(ID_DRIVE)
 
-# --- BUSCADOR ---
-busqueda = st.text_input("Buscar videojuego por título:", placeholder="Ej. Batman, Witcher, Portal...")
+# --- INTERFAZ DE BÚSQUEDA ---
+st.title("🎮 GameLens: Gaming Warehouse")
+
+busqueda = st.text_input("Buscar juego en el catálogo:", placeholder="Ej: Witcher 3, Elden Ring...")
 
 if busqueda:
     try:
-        conn = sqlite3.connect(DB_PATH)
-        
-        # Buscamos en CAT_Juego usando la columna 'titulo'
+        conn = sqlite3.connect(db_final)
+        # Usamos tus nombres de tabla y columna: CAT_Juego y titulo
         query = """
-            SELECT titulo, categoria, url_portada, puntuacion_igdb, 
-                   hltb_historia_principal, hltb_completacionista, 
-                   steam_price_final, resumen
+            SELECT titulo, categoria, url_portada, hltb_historia_principal, 
+                   steam_price_final, puntuacion_igdb
             FROM CAT_Juego 
-            WHERE titulo LIKE ? and id_steam is not null
-            LIMIT 10
+            WHERE titulo LIKE ? 
+            LIMIT 15
         """
         df = pd.read_sql(query, conn, params=(f'%{busqueda}%',))
         conn.close()
 
         if not df.empty:
-            for _, row in df.iterrows():
-                # Creamos una "tarjeta" por cada juego usando columnas
-                with st.container():
-                    col1, col2 = st.columns([1, 4])
-                    
-                    with col1:
-                        # Si hay URL de portada, la mostramos
-                        if row['url_portada']:
-                            st.image(row['url_portada'], use_container_width=True)
-                        else:
-                            st.image("https://via.placeholder.com/150?text=No+Image", use_container_width=True)
-                    
-                    with col2:
-                        st.subheader(row['titulo'])
-                        st.caption(f"Categoría: {row['categoria']} | Score IGDB: {row['puntuacion_igdb'] or 'N/A'}")
-                        
-                        # Métricas rápidas de HLTB y Precio
-                        m1, m2, m3 = st.columns(3)
-                        m1.metric("Historia", f"{row['hltb_historia_principal'] or 0}h")
-                        m2.metric("100%", f"{row['hltb_completacionista'] or 0}h")
-                        m3.metric("Precio Steam", f"${row['steam_price_final'] or 0}")
-                        
-                        with st.expander("Ver Resumen"):
-                            st.write(row['resumen'] if row['resumen'] else "Sin resumen disponible.")
-                st.divider()
+            cols = st.columns(3)
+            for idx, row in df.iterrows():
+                with cols[idx % 3]:
+                    st.image(row['url_portada'] if row['url_portada'] else "https://via.placeholder.com/150", use_container_width=True)
+                    st.subheader(row['titulo'])
+                    st.write(f"⭐ Score: {row['puntuacion_igdb']} | ⏱️ {row['hltb_historia_principal']}h")
+                    st.write(f"💰 Precio: ${row['steam_price_final']}")
+                    st.divider()
         else:
-            st.warning(f"No se encontraron juegos que coincidan con '{busqueda}'")
-            
+            st.info("No se encontraron juegos con ese nombre.")
     except Exception as e:
-        st.error(f"Error en la consulta: {e}")
-
-# --- ESTADÍSTICAS RÁPIDAS (Sidebar) ---
-with st.sidebar:
-    st.header("Estado de la DB")
-    if st.button("Verificar Tablas"):
-        conn = sqlite3.connect(DB_PATH)
-        tablas = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table'", conn)
-        st.write(tablas)
-        conn.close()
+        st.error(f"Error en la base de datos: {e}")
