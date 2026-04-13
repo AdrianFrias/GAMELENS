@@ -25,23 +25,28 @@ with st.sidebar.expander("🛠️ Debug: Estado de la Base de Datos"):
     else:
         st.write("❌ Archivo no encontrado localmente.")
 
-@st.cache_resource
+@@st.cache_resource
 def descargar_db(file_id):
     if not DB_PATH.exists() or os.path.getsize(DB_PATH) < 1_000_000:
         if DB_PATH.exists():
             os.remove(DB_PATH)
         
-        with st.spinner("Descargando base de datos (355MB)... Esto tomará un momento."):
+        with st.spinner("Descargando base de datos (355MB)..."):
             url = f"https://drive.google.com/uc?id={file_id}"
-            gdown.download(url, str(DB_PATH), quiet=False, fuzzy=True)
+            st.write(f"🔗 Intentando descargar: `{url}`")  # DEBUG
+            try:
+                gdown.download(url, str(DB_PATH), quiet=False, fuzzy=True)
+            except Exception as e:
+                st.error(f"gdown falló: {e}")
+                st.stop()
         
         size_mb = os.path.getsize(DB_PATH) / (1024 * 1024) if DB_PATH.exists() else 0
         if size_mb < 1:
-            st.error(f"❌ Drive bloqueó la descarga ({size_mb:.1f} MB recibidos). Intenta de nuevo.")
+            st.error(f"❌ Descarga fallida: {size_mb:.1f} MB")
             if DB_PATH.exists(): os.remove(DB_PATH)
             st.stop()
         
-        st.success(f"✅ Base de datos descargada: {size_mb:.1f} MB")
+        st.success(f"✅ Descargada: {size_mb:.1f} MB")
     
     return str(DB_PATH)
 
