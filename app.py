@@ -35,7 +35,7 @@ def descargar_db(file_id):
             url = f"https://drive.google.com/uc?id={file_id}"
             st.write(f"🔗 Intentando descargar: `{url}`")  # DEBUG
             try:
-                gdown.download(url, str(DB_PATH), quiet=False, fuzzy=True)
+                gdown.download(url, str(DB_PATH), quiet=False)
             except Exception as e:
                 st.error(f"gdown falló: {e}")
                 st.stop()
