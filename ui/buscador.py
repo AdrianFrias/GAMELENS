@@ -16,6 +16,8 @@ def mostrar_resultados(conn, busqueda):
                         use_container_width=True
                     )
                     if st.button(row['titulo'], key=f"btn_search_{row['titulo']}_{r_idx}_{c_idx}", use_container_width=True):
+                        st.session_state["busqueda_guardada"] = busqueda
+                        st.session_state["_aplicar_busqueda"] = ""
                         st.session_state["juego_seleccionado"] = row['titulo']
                         st.rerun()
 

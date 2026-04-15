@@ -25,3 +25,4 @@ models/*.npy
 *.png
 
 .streamlit/
+*.parquet

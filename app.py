@@ -27,6 +27,11 @@ def descargar_db(file_id):
 
 if "juego_seleccionado" not in st.session_state:
     st.session_state["juego_seleccionado"] = None
+if "busqueda_guardada" not in st.session_state:
+    st.session_state["busqueda_guardada"] = ""
+
+if st.session_state.get("_aplicar_busqueda") is not None:
+    st.session_state["search_input"] = st.session_state.pop("_aplicar_busqueda")
 
 
 try:
@@ -58,24 +63,25 @@ st.session_state["OPENAI_KEY"] = OPENAI_KEY
 header_col1, header_col2 = st.columns([1, 3])
 
 with header_col1:
-    if st.button("🚀 GameLens"):
+    if st.button("💎 GameLens"):
         st.session_state["juego_seleccionado"] = None
         st.rerun()
 
 with header_col2:
-    busqueda = st.text_input("", placeholder="Buscar título...", label_visibility="collapsed")
+    busqueda = st.text_input("", placeholder="Buscar título...", label_visibility="collapsed", key="search_input")
 
 st.divider()
 
 try:
-    conn = sqlite3.connect(db_final)
+    conn = sqlite3.connect(db_final, check_same_thread=False)
     
-    if st.session_state["juego_seleccionado"]:
-        mostrar_detalle(conn)
-        
-    elif busqueda:
+    if busqueda:
+        st.session_state["juego_seleccionado"] = None
         mostrar_resultados(conn, busqueda)
-        
+
+    elif st.session_state["juego_seleccionado"]:
+        mostrar_detalle(conn)
+
     else:
         st.info("👋 Ingresa el nombre de un juego arriba para iniciar la exploración.")
         
