@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import streamlit as st
-import subprocess
+import gdown
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = BASE_DIR / "models"
@@ -16,17 +16,24 @@ PRIOR_METACRITIC_SCORE = 72.0
 def _descargar_modelo(file_id, destino):
     if not destino.exists() or destino.stat().st_size < 1000:
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["gdown", "--fuzzy", f"https://drive.google.com/uc?id={file_id}", "-O", str(destino)], check=True)
+        gdown.download(  # type: ignore[attr-defined]
+            f"https://drive.google.com/uc?id={file_id}",
+            str(destino),
+            quiet=False,
+            fuzzy=True,
+        )
+
+
+def _secret(key):
+    try:
+        return st.secrets[key]
+    except Exception:
+        return os.getenv(key, "")
+
 
 @st.cache_resource
 def cargar_modelo():
     try:
-        def _secret(key):
-            try:
-                return st.secrets[key]
-            except Exception:
-                return os.getenv(key, "")
-
         ids = {
             "modelo":   _secret("MODELO_RF_ID"),
             "umbral":   _secret("UMBRAL_ID"),
@@ -45,7 +52,8 @@ def cargar_modelo():
         umbral = joblib.load(archivos["umbral"])
         columnas = joblib.load(archivos["columnas"])
         return modelo, umbral, columnas
-    except Exception:
+    except Exception as e:
+        st.error(f"Error cargando modelo: {e}")
         return None, None, None
 
 
