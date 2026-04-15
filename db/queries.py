@@ -1,4 +1,6 @@
 import pandas as pd
+from collections import Counter
+import re
 
 def obtener_generos(conn, juego_id):
     query = """
@@ -32,13 +34,13 @@ def score_propio(row):
 
 def juegos_similares(conn, juego_id):
     query = """
-    SELECT j2.titulo, j2.url_portada
-    FROM REL_Juego_Etiqueta r1
-    JOIN REL_Juego_Etiqueta r2 ON r1.etiqueta_id = r2.etiqueta_id
+    SELECT j2.titulo, j2.url_portada, COUNT(*) as similitud
+    FROM REL_Juego_Genero r1
+    JOIN REL_Juego_Genero r2 ON r1.genero_id = r2.genero_id
     JOIN CAT_Juego j2 ON j2.juego_id = r2.juego_id
     WHERE r1.juego_id = ? AND j2.juego_id != ?
     GROUP BY j2.juego_id
-    ORDER BY COUNT(*) DESC
+    ORDER BY similitud DESC
     LIMIT 10
     """
     return pd.read_sql(query, conn, params=(juego_id, juego_id))
@@ -66,3 +68,29 @@ def buscar_juegos(conn, busqueda):
         df['completitud'] = df[['categoria', 'hltb_historia_principal', 'steam_price_final', 'puntuacion_igdb']].notnull().sum(axis=1)
         df = df.sort_values(by=['steam_price_final', 'completitud'], ascending=[False, False])
     return df
+
+def obtener_topicos_resenas(conn, juego_id):
+    query = """
+    SELECT temas_pos, palabras_clave_neg
+    FROM Hist_Steam_Reviews
+    WHERE juego_id = ? 
+    """
+    df = pd.read_sql(query, conn, params=(juego_id,))
+    
+    if df.empty:
+        return [], []
+        
+    def procesar_textos(serie):
+        texto_unido = serie.dropna().str.cat(sep=' ')
+        if not texto_unido:
+            return []
+            
+        palabras_limpias = re.findall(r'\b[a-zA-ZáéíóúÁÉÍÓÚñÑ]{3,}\b', texto_unido)
+        
+        top = [palabra.title() for palabra, _ in Counter(palabras_limpias).most_common(15)]
+        return top
+
+    top_positivos = procesar_textos(df['temas_pos'])
+    top_negativos = procesar_textos(df['palabras_clave_neg'])
+    
+    return top_positivos, top_negativos
