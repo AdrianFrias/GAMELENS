@@ -30,9 +30,6 @@ if "juego_seleccionado" not in st.session_state:
 if "busqueda_guardada" not in st.session_state:
     st.session_state["busqueda_guardada"] = ""
 
-if st.session_state.get("_aplicar_busqueda") is not None:
-    st.session_state["search_input"] = st.session_state.pop("_aplicar_busqueda")
-
 
 try:
     ID_DRIVE = st.secrets["DRIVE_FILE_ID"]
@@ -75,12 +72,16 @@ st.divider()
 try:
     conn = sqlite3.connect(db_final, check_same_thread=False)
     
-    if busqueda:
-        st.session_state["juego_seleccionado"] = None
-        mostrar_resultados(conn, busqueda)
+    if st.session_state["juego_seleccionado"]:
+        busqueda_cambio = busqueda and busqueda != st.session_state["busqueda_guardada"]
+        if busqueda_cambio:
+            st.session_state["juego_seleccionado"] = None
+            mostrar_resultados(conn, busqueda)
+        else:
+            mostrar_detalle(conn)
 
-    elif st.session_state["juego_seleccionado"]:
-        mostrar_detalle(conn)
+    elif busqueda:
+        mostrar_resultados(conn, busqueda)
 
     else:
         st.info("👋 Ingresa el nombre de un juego arriba para iniciar la exploración.")

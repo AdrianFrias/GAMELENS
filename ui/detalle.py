@@ -25,7 +25,6 @@ def mostrar_detalle(conn):
         score_meta = round(juego['metacritic_score']) if pd.notnull(juego['metacritic_score']) else "N/A"
 
         if st.button("⬅ Volver"):
-            st.session_state["_aplicar_busqueda"] = st.session_state.get("busqueda_guardada", "")
             st.session_state["juego_seleccionado"] = None
             st.rerun()
 
