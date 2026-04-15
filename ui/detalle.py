@@ -53,7 +53,9 @@ def mostrar_detalle(conn):
 
             probabilidad, umbral = predecir_descuento(juego, generos_lista, etiquetas_lista, conn=conn)
 
-            if probabilidad is not None:
+            if probabilidad is None:
+                st.warning("Modelo de predicción no disponible. Verifica que los archivos `.pkl` estén en la carpeta `models/` del repositorio.")
+            else:
                 prob_pct = int(probabilidad * 100)
 
                 st.markdown("### 🔮 Radar de Descuentos (7 días)")

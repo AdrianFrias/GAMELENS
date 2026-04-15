@@ -3,6 +3,9 @@ import sqlite3
 import os
 from pathlib import Path
 import gdown
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from ui.detalle import mostrar_detalle
 from ui.buscador import mostrar_resultados

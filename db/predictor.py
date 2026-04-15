@@ -1,8 +1,10 @@
+import os
 import joblib
 import pandas as pd
 import numpy as np
 from pathlib import Path
 import streamlit as st
+from gdown.download import download as gdown_download
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = BASE_DIR / "models"
@@ -11,12 +13,37 @@ PRIOR_GLOBAL_DESC = 0.19
 PRIOR_METACRITIC_SCORE = 72.0
 
 
+def _descargar_modelo(file_id, destino):
+    if not destino.exists() or destino.stat().st_size < 1000:
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        gdown_download(f"https://drive.google.com/uc?id={file_id}", str(destino), quiet=True)
+
 @st.cache_resource
 def cargar_modelo():
     try:
-        modelo = joblib.load(MODELS_DIR / "modelo_descuentos_rf.pkl")
-        umbral = joblib.load(MODELS_DIR / "threshold_descuentos.pkl")
-        columnas = joblib.load(MODELS_DIR / "features_cols.pkl")
+        def _secret(key):
+            try:
+                return st.secrets[key]
+            except Exception:
+                return os.getenv(key, "")
+
+        ids = {
+            "modelo":   _secret("MODELO_RF_ID"),
+            "umbral":   _secret("UMBRAL_ID"),
+            "columnas": _secret("FEATURES_ID"),
+        }
+        archivos = {
+            "modelo":   MODELS_DIR / "modelo_descuentos_rf.pkl",
+            "umbral":   MODELS_DIR / "threshold_descuentos.pkl",
+            "columnas": MODELS_DIR / "features_cols.pkl",
+        }
+        for key, file_id in ids.items():
+            if file_id:
+                _descargar_modelo(file_id, archivos[key])
+
+        modelo = joblib.load(archivos["modelo"])
+        umbral = joblib.load(archivos["umbral"])
+        columnas = joblib.load(archivos["columnas"])
         return modelo, umbral, columnas
     except Exception:
         return None, None, None
