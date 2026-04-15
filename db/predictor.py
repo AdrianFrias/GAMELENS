@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import streamlit as st
-from gdown.download import download as gdown_download
+import subprocess
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODELS_DIR = BASE_DIR / "models"
@@ -16,7 +16,7 @@ PRIOR_METACRITIC_SCORE = 72.0
 def _descargar_modelo(file_id, destino):
     if not destino.exists() or destino.stat().st_size < 1000:
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        gdown_download(f"https://drive.google.com/uc?id={file_id}", str(destino), quiet=True)
+        subprocess.run(["gdown", "--fuzzy", f"https://drive.google.com/uc?id={file_id}", "-O", str(destino)], check=True)
 
 @st.cache_resource
 def cargar_modelo():
