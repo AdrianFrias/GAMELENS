@@ -20,7 +20,6 @@ def _descargar_modelo(file_id, destino):
             f"https://drive.google.com/uc?id={file_id}",
             str(destino),
             quiet=False,
-            fuzzy=True,
         )
 
 
